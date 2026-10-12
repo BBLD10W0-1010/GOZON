@@ -55,7 +55,6 @@ func validate(s domain.State) error {
 	return nil
 }
 
-// Save replaces the file only after a complete snapshot has been written.
 func (f *File) Save(s domain.State) error {
 	if err := validate(s); err != nil {
 		return fmt.Errorf("проверить данные: %w", err)
