@@ -22,6 +22,7 @@ const help = `Команды (дедлайн — YYYY-MM-DD):
   import "путь к файлу.json"
   exit
 Заголовки и пути с пробелами заключайте в кавычки.
+
 `
 
 type App struct {

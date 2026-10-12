@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// Repository belongs to the business layer that consumes it.
 type Repository interface {
 	Load() (domain.State, error)
 	Save(domain.State) error
@@ -134,7 +133,6 @@ func (s *Service) Edit(id domain.ID, change Edit) error {
 	if t.Status.Terminal() {
 		return fmt.Errorf("ID %d: %w", id, domain.ErrTerminal)
 	}
-	// Unchanged deadlines may already be overdue; only new values are validated.
 	if change.Title != nil {
 		if strings.TrimSpace(*change.Title) == "" {
 			return fmt.Errorf("заголовок не может быть пустым: %w", domain.ErrInvalid)

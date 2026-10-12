@@ -30,7 +30,6 @@ type Task struct {
 	Deadline time.Time `json:"deadline"`
 }
 
-// State keeps the next identifier even after all tasks have been deleted.
 type State struct {
 	NextID ID     `json:"next_id"`
 	Tasks  []Task `json:"tasks"`
@@ -50,7 +49,6 @@ func ParseDeadline(value string) (time.Time, error) {
 	return date, nil
 }
 
-// Today compares calendar dates: a deadline today remains valid until tomorrow.
 func Today(now time.Time) time.Time {
 	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 }
