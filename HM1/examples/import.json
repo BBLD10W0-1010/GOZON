@@ -1,0 +1,5 @@
+[
+  {"title": "Изучить интерфейсы Go", "deadline": "2099-12-30"},
+  {"title": "Написать тесты", "deadline": "2099-12-31", "status": "in_progress"},
+  {"title": "", "deadline": "2099-12-31"}
+]
