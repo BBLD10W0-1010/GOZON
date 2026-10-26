@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"gozon/internal/productpb"
@@ -65,16 +64,10 @@ func TestHTTPProductErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var failed atomic.Bool
-			s := NewService(stubClient(func(_ context.Context, req *productpb.GetProductRequest) (*productpb.Product, error) {
-				if failed.Load() {
-					return nil, status.Error(tc.code, "catalog error")
-				}
-				return &productpb.Product{Sku: req.GetSku(), Price: 10}, nil
-			}))
-			require.NoError(t, s.AddToCart(context.Background(), 1, 10, 1))
-			require.NoError(t, s.AddToCart(context.Background(), 1, 20, 1))
-			failed.Store(true)
+			s := seedCart(t, 10, 20)
+			s.client = stubClient(func(context.Context, *productpb.GetProductRequest) (*productpb.Product, error) {
+				return nil, status.Error(tc.code, "catalog error")
+			})
 			h := newHandler(s)
 			post := httptest.NewRecorder()
 			h.ServeHTTP(post, httptest.NewRequest(http.MethodPost, "/user/1/cart/10", strings.NewReader(`{"count":1}`)))
@@ -106,13 +99,20 @@ func TestHTTPGetContract(t *testing.T) {
 		{SKU: 10, Name: "Book", Price: 10, Count: 4},
 		{SKU: 20, Name: "Book", Price: 10, Count: 2},
 	}, TotalPrice: 60}, got)
-	decoder := json.NewDecoder(bytes.NewReader(w.Body.Bytes()))
+	requireCartJSONNumbers(t, w.Body.Bytes())
+}
+
+func requireCartJSONNumbers(t *testing.T, data []byte) {
+	t.Helper()
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	var fields map[string]any
 	require.NoError(t, decoder.Decode(&fields))
 	require.IsType(t, json.Number(""), fields["total_price"])
+	require.IsType(t, []any{}, fields["items"])
 	items := fields["items"].([]any)
 	for _, value := range items {
+		require.IsType(t, map[string]any{}, value)
 		item := value.(map[string]any)
 		require.IsType(t, json.Number(""), item["sku"])
 		require.IsType(t, json.Number(""), item["price"])
