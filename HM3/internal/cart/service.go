@@ -3,7 +3,6 @@ package cart
 import (
 	"context"
 	"errors"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -21,23 +20,6 @@ var (
 
 type ProductClient interface {
 	GetProduct(context.Context, *productpb.GetProductRequest, ...grpc.CallOption) (*productpb.Product, error)
-}
-
-type Item struct {
-	SKU   int64  `json:"sku"`
-	Name  string `json:"name"`
-	Count uint32 `json:"count"`
-	Price uint32 `json:"price"`
-}
-
-type Cart struct {
-	Items      []Item `json:"items"`
-	TotalPrice uint32 `json:"total_price"`
-}
-
-type cartData struct {
-	items map[int64]Item
-	total uint32
 }
 
 type Service struct {
@@ -72,20 +54,19 @@ func (s *Service) AddToCart(ctx context.Context, userID, sku int64, count uint32
 	if err != nil {
 		return err
 	}
+	return s.addItem(userID, productItem(p, count))
+}
+
+func (s *Service) addItem(userID int64, item Item) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	c := s.carts[userID]
 	if c == nil {
 		c = &cartData{items: make(map[int64]Item)}
 	}
-	previous := c.items[sku]
-	newCount := uint64(previous.Count) + uint64(count)
-	newTotal := uint64(c.total) - uint64(previous.Price)*uint64(previous.Count) + uint64(p.GetPrice())*newCount
-	if newCount > math.MaxUint32 || newTotal > math.MaxUint32 {
-		return ErrOverflow
+	if err := c.add(item); err != nil {
+		return err
 	}
-	c.items[sku] = Item{SKU: sku, Name: p.GetName(), Count: uint32(newCount), Price: uint32(p.GetPrice())}
-	c.total = uint32(newTotal)
 	s.carts[userID] = c
 	return nil
 }
@@ -101,7 +82,6 @@ func (s *Service) snapshot(userID int64) []Item {
 	for _, item := range c.items {
 		items = append(items, item)
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].SKU < items[j].SKU })
 	return items
 }
 
@@ -113,8 +93,17 @@ func (s *Service) GetCart(ctx context.Context, userID int64) (Cart, error) {
 	if len(snapshot) == 0 {
 		return Cart{}, ErrCartNotFound
 	}
+	sort.Slice(snapshot, func(i, j int) bool { return snapshot[i].SKU < snapshot[j].SKU })
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
+	items, err := s.fetchItems(ctx, snapshot)
+	if err != nil {
+		return Cart{}, err
+	}
+	return makeCart(items)
+}
+
+func (s *Service) fetchItems(ctx context.Context, snapshot []Item) ([]Item, error) {
 	items := make([]Item, len(snapshot))
 	errs := make([]error, len(snapshot))
 	var wg sync.WaitGroup
@@ -122,24 +111,22 @@ func (s *Service) GetCart(ctx context.Context, userID int64) (Cart, error) {
 	for i, line := range snapshot {
 		go func() {
 			defer wg.Done()
-			p, err := s.lookup(ctx, line.SKU)
-			if err != nil {
-				errs[i] = err
-				return
-			}
-			items[i] = Item{SKU: line.SKU, Name: p.GetName(), Count: line.Count, Price: uint32(p.GetPrice())}
+			items[i], errs[i] = s.refreshItem(ctx, line)
 		}()
 	}
 	wg.Wait()
-	var total uint64
-	for i, err := range errs {
+	for _, err := range errs {
 		if err != nil {
-			return Cart{}, err
-		}
-		total += uint64(items[i].Price) * uint64(items[i].Count)
-		if total > math.MaxUint32 {
-			return Cart{}, ErrOverflow
+			return nil, err
 		}
 	}
-	return Cart{Items: items, TotalPrice: uint32(total)}, nil
+	return items, nil
+}
+
+func (s *Service) refreshItem(ctx context.Context, line Item) (Item, error) {
+	p, err := s.lookup(ctx, line.SKU)
+	if err != nil {
+		return Item{}, err
+	}
+	return productItem(p, line.Count), nil
 }
