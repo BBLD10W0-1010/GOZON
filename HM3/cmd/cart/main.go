@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"gozon/internal/productpb"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"gozon/internal/productpb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
