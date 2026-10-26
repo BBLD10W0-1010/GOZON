@@ -1,0 +1,63 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cart API",
+    "version": "1.0.0",
+    "description": "In-memory shopping carts. Products are checked through product-service over gRPC."
+  },
+  "servers": [{"url": "http://localhost:8080"}],
+  "paths": {
+    "/user/{user_id}/cart/{sku_id}": {
+      "post": {
+        "summary": "Add a product to a user's cart",
+        "parameters": [
+          {"name": "user_id", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}},
+          {"name": "sku_id", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"type": "object", "required": ["count"], "properties": {"count": {"type": "integer", "format": "int64", "minimum": 1, "maximum": 4294967295}}, "additionalProperties": false}, "example": {"count": 2}}}
+        },
+        "responses": {
+          "200": {"description": "Product added"},
+          "400": {"description": "Invalid user_id, sku_id or count"},
+          "412": {"description": "Product not found"},
+          "500": {"description": "Product service error or cart total overflow"}
+        }
+      }
+    },
+    "/user/{user_id}/cart": {
+      "get": {
+        "summary": "Get a user's cart",
+        "parameters": [{"name": "user_id", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}],
+        "responses": {
+          "200": {"description": "Cart contents sorted by SKU", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Cart"}}}},
+          "400": {"description": "Invalid user_id"},
+          "404": {"description": "Cart is empty or absent"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Cart": {
+        "type": "object",
+        "required": ["items", "total_price"],
+        "properties": {
+          "items": {"type": "array", "items": {"$ref": "#/components/schemas/CartItem"}},
+          "total_price": {"type": "integer", "format": "int64", "minimum": 0, "maximum": 4294967295}
+        }
+      },
+      "CartItem": {
+        "type": "object",
+        "required": ["sku", "name", "count", "price"],
+        "properties": {
+          "sku": {"type": "integer", "format": "int64", "minimum": 1},
+          "name": {"type": "string"},
+          "count": {"type": "integer", "format": "int64", "minimum": 1, "maximum": 4294967295},
+          "price": {"type": "integer", "format": "int64", "minimum": 0, "maximum": 2147483647}
+        }
+      }
+    }
+  }
+}
