@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
@@ -8,9 +9,6 @@ import (
 	"syscall"
 
 	"gozon/internal/product"
-	"gozon/internal/productpb"
-
-	"google.golang.org/grpc"
 )
 
 func main() {
@@ -30,16 +28,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	server := grpc.NewServer()
-	productpb.RegisterProductServiceServer(server, product.NewServer(items))
-	go func() {
-		if err := server.Serve(listener); err != nil {
-			log.Printf("gRPC server stopped: %v", err)
-		}
-	}()
-	log.Printf("product-service listening on %s with %d products", address, len(items))
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	<-signals
-	server.GracefulStop()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	log.Printf("product-service listening on %s with %d products", listener.Addr(), len(items))
+	if err := run(ctx, listener, items); err != nil {
+		log.Fatal(err)
+	}
 }
