@@ -37,6 +37,8 @@ func TestHTTPAddValidation(t *testing.T) {
 		{"empty", "/user/1/cart/10", ``},
 		{"extra field", "/user/1/cart/10", `{"count":1,"extra":true}`},
 		{"trailing JSON", "/user/1/cart/10", `{"count":1} {}`},
+		{"leading zero", "/user/1/cart/10", `01`},
+		{"raw string", "/user/1/cart/10", `"2"`},
 		{"large body", "/user/1/cart/10", strings.Repeat("1", 1025)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

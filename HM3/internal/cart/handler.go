@@ -87,7 +87,7 @@ func positiveID(raw string) (int64, error) {
 
 func readCount(r *http.Request) (uint32, error) {
 	data, err := io.ReadAll(io.LimitReader(r.Body, 1025))
-	if err != nil || len(data) > 1024 {
+	if err != nil || len(data) > 1024 || !json.Valid(data) {
 		return 0, ErrInvalidArgument
 	}
 	data = bytes.TrimSpace(data)

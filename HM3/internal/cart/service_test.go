@@ -257,3 +257,34 @@ func TestGetCartDisappearedProduct(t *testing.T) {
 	require.Equal(t, codes.NotFound, status.Code(err))
 	require.Equal(t, Cart{}, got)
 }
+
+func TestGetCartPriceOverflow(t *testing.T) {
+	t.Parallel()
+	var updated atomic.Bool
+	s := NewService(stubClient(func(_ context.Context, req *productpb.GetProductRequest) (*productpb.Product, error) {
+		price := int32(10)
+		if updated.Load() {
+			price = math.MaxInt32
+		}
+		return &productpb.Product{Sku: req.GetSku(), Price: price}, nil
+	}))
+	require.NoError(t, s.AddToCart(context.Background(), 1, 10, 3))
+	updated.Store(true)
+	got, err := s.GetCart(context.Background(), 1)
+	require.ErrorIs(t, err, ErrOverflow)
+	require.Equal(t, Cart{}, got)
+}
+
+func TestAddToCartCanceled(t *testing.T) {
+	t.Parallel()
+	s := NewService(stubClient(func(ctx context.Context, _ *productpb.GetProductRequest) (*productpb.Product, error) {
+		<-ctx.Done()
+		return nil, status.FromContextError(ctx.Err()).Err()
+	}))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	err := s.AddToCart(ctx, 1, 10, 1)
+	require.Equal(t, codes.Canceled, status.Code(err))
+	_, err = s.GetCart(context.Background(), 1)
+	require.ErrorIs(t, err, ErrCartNotFound)
+}
