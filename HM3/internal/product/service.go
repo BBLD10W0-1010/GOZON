@@ -2,12 +2,7 @@ package product
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"math"
-	"os"
 	"sort"
-	"strconv"
 
 	"gozon/internal/productpb"
 
@@ -19,36 +14,6 @@ type Item struct {
 	SKU   int64
 	Name  string
 	Price uint32
-}
-
-// Load reads and validates the entire catalog before the server starts.
-func Load(path string) (map[int64]Item, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read products: %w", err)
-	}
-	var records map[string]struct {
-		Name  string `json:"name"`
-		Price int64  `json:"price"`
-	}
-	if err := json.Unmarshal(data, &records); err != nil {
-		return nil, fmt.Errorf("decode products: %w", err)
-	}
-	if records == nil {
-		return nil, fmt.Errorf("products must be a JSON object")
-	}
-	items := make(map[int64]Item, len(records))
-	for key, record := range records {
-		sku, err := strconv.ParseInt(key, 10, 64)
-		if err != nil || sku <= 0 {
-			return nil, fmt.Errorf("invalid product SKU %q", key)
-		}
-		if record.Name == "" || record.Price < 0 || record.Price > math.MaxInt32 {
-			return nil, fmt.Errorf("invalid product %q: name is required and price must fit int32", key)
-		}
-		items[sku] = Item{SKU: sku, Name: record.Name, Price: uint32(record.Price)}
-	}
-	return items, nil
 }
 
 type Server struct {
@@ -84,18 +49,9 @@ func (s *Server) GetProduct(_ context.Context, req *productpb.GetProductRequest)
 }
 
 func (s *Server) ListProducts(_ context.Context, req *productpb.ListProductsRequest) (*productpb.ListProductsResponse, error) {
-	if req == nil {
-		req = &productpb.ListProductsRequest{}
-	}
-	page, size := req.GetPage(), req.GetPageSize()
-	if page < 0 || size < 0 || size > 100 {
-		return nil, status.Error(codes.InvalidArgument, "page and page_size must be positive; page_size must not exceed 100")
-	}
-	if page == 0 {
-		page = 1
-	}
-	if size == 0 {
-		size = 20
+	page, size, err := pagination(req)
+	if err != nil {
+		return nil, err
 	}
 	start := int64(page-1) * int64(size)
 	response := &productpb.ListProductsResponse{Total: int64(len(s.skus))}
@@ -110,4 +66,18 @@ func (s *Server) ListProducts(_ context.Context, req *productpb.ListProductsRequ
 		response.NextPage = page + 1
 	}
 	return response, nil
+}
+
+func pagination(req *productpb.ListProductsRequest) (int32, int32, error) {
+	page, size := req.GetPage(), req.GetPageSize()
+	if page < 0 || size < 0 || size > 100 {
+		return 0, 0, status.Error(codes.InvalidArgument, "page must not be negative; page_size must be between 0 and 100")
+	}
+	if page == 0 {
+		page = 1
+	}
+	if size == 0 {
+		size = 20
+	}
+	return page, size, nil
 }
