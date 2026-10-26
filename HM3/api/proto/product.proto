@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package product.v1;
+
+option go_package = "gozon/internal/productpb";
+
+service ProductService {
+  rpc GetProduct(GetProductRequest) returns (Product);
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+}
+
+message GetProductRequest {
+  int64 sku = 1;
+}
+
+message Product {
+  int64 sku = 1;
+  string name = 2;
+  int32 price = 3;
+}
+
+message ListProductsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+  int64 total = 2;
+  int32 next_page = 3;
+}
