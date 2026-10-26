@@ -5,6 +5,8 @@ package test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
 	"math"
 	"math/big"
 	"net/http"
@@ -24,6 +26,18 @@ type clients struct {
 	products productpb.ProductServiceClient
 	http     *http.Client
 	cartURL  string
+}
+
+type cartItem struct {
+	SKU   int64  `json:"sku"`
+	Name  string `json:"name"`
+	Count uint32 `json:"count"`
+	Price uint32 `json:"price"`
+}
+
+type cartResponse struct {
+	Items      []cartItem `json:"items"`
+	TotalPrice uint32     `json:"total_price"`
 }
 
 func newClients(t *testing.T) clients {
@@ -57,6 +71,22 @@ func (c clients) request(t *testing.T, method, path, body string) *http.Response
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, response.Body.Close()) })
 	return response
+}
+
+func (c clients) add(t *testing.T, path string, sku int64, count uint32) {
+	t.Helper()
+	response := c.request(t, http.MethodPost, fmt.Sprintf("%s/%d", path, sku), fmt.Sprintf(`{"count":%d}`, count))
+	require.Equal(t, http.StatusOK, response.StatusCode)
+}
+
+func (c clients) cart(t *testing.T, path string) cartResponse {
+	t.Helper()
+	response := c.request(t, http.MethodGet, path, "")
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	require.Equal(t, "application/json", response.Header.Get("Content-Type"))
+	var cart cartResponse
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&cart))
+	return cart
 }
 
 func (c clients) catalog(t *testing.T) []*productpb.Product {
