@@ -2,15 +2,12 @@ package main
 
 import (
 	"context"
+	"gozon/internal/productpb"
 	"log"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	"gozon/internal/cart"
-	"gozon/internal/productpb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -30,19 +27,14 @@ func main() {
 	if address == "" {
 		address = ":8080"
 	}
-	server := &http.Server{Addr: address, Handler: cart.NewHandler(productpb.NewProductServiceClient(conn)), ReadHeaderTimeout: 5 * time.Second}
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
-		}
-	}()
-	log.Printf("cart listening on %s", address)
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	<-signals
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("HTTP shutdown: %v", err)
+	log.Printf("cart listening on %s", listener.Addr())
+	if err := run(ctx, listener, productpb.NewProductServiceClient(conn)); err != nil {
+		log.Fatal(err)
 	}
 }
