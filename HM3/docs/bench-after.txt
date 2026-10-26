@@ -1,0 +1,22 @@
+go test -run='^$' -bench=. -benchmem -count=3 ./internal/product ./internal/cart
+goos: windows
+goarch: amd64
+pkg: gozon/internal/product
+cpu: 12th Gen Intel(R) Core(TM) i3-12100
+BenchmarkGetProduct-8   	44303656	        26.67 ns/op	      80 B/op	       1 allocs/op
+BenchmarkGetProduct-8   	44999437	        26.51 ns/op	      80 B/op	       1 allocs/op
+BenchmarkGetProduct-8   	41821317	        27.23 ns/op	      80 B/op	       1 allocs/op
+PASS
+ok  	gozon/internal/product	3.597s
+goos: windows
+goarch: amd64
+pkg: gozon/internal/cart
+cpu: 12th Gen Intel(R) Core(TM) i3-12100
+BenchmarkAddToCart-8   	 2831079	       419.1 ns/op	     400 B/op	       6 allocs/op
+BenchmarkAddToCart-8   	 2812171	       429.8 ns/op	     400 B/op	       6 allocs/op
+BenchmarkAddToCart-8   	 2771800	       424.4 ns/op	     400 B/op	       6 allocs/op
+BenchmarkGetCart-8     	  341727	      3502 ns/op	    1400 B/op	      20 allocs/op
+BenchmarkGetCart-8     	  344874	      3540 ns/op	    1400 B/op	      20 allocs/op
+BenchmarkGetCart-8     	  336997	      3511 ns/op	    1400 B/op	      20 allocs/op
+PASS
+ok  	gozon/internal/cart	7.268s
